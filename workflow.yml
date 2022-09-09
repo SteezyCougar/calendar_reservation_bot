@@ -1,0 +1,68 @@
+# If you desire different behavior for weekends vs days, make two different calendars for them and set days_available appropriately.
+# If you want to use black-out days, you must make 'all-day' calendar events on those days with the word "BLACKOUT" somewhere in the event name. This bot will consider those days fully scheduled and will not pass them to any custom job functions or allow users to schedule on those days.
+
+schedule_name:
+#slack_creds: #not recommended, preferred you use env-var "". Leave this commented out to use the env-var
+#calendar_uuid: #ditto above
+#calendar_creds: #ditto above
+
+
+#Rules for reservations
+ max_spots_per_day: 0 #0 to calculate based on time-blocks available. Does not work with external scheduling.
+ max_spots_per_week: 0 # 0 for unlimited, else will only allow this many total reservations in a calendar week
+ max_spots_per_month: 0 #0 for unlimited, else will only allow this many total reservations in a calendar month
+ max_spots_per_year: 0 #0 for unlimited, else will only allow this many total reservations in a calendar year
+ max_reserved_per_person_per_reservation: 0 #0 to default to max_reserved_per_reservation. max amount of headcount a single person can reserve per reservation. Always applies, even if using external scheduling
+ max_reserved_per_reservation: 0 #max headcount allowed to be reserved across anyone per reservation. 0 for unlimited headcount. This number will be used for filling reservations not filled by a single person (if fill_reservations is true or ask)
+ max_individual_reservations_per_day: 0 #Only allow someone to have x  reservations per day (Including past). 0 for unlimited
+ max_individual_reservations_per_week: 0 #Only allow someone to have x reservations in a calendar week. 0 for unlimited
+ max_individual_reservations_per_month: 0 #Only allow someone to have x reservations per month. 0 for unlimited
+ max_individual_reservations_per_year: 0 #Only allow someone to have X reservations per year. 0 for unlimited
+ allow_extended_reservations: True #Allows people to reserve multiple time-blocks in order. Can also be useful for things like golf and can be used by an external scheduler. (9 vs 18 holes)
+ max_extended_resrvation_blocks: 2 #Only allows someone to hold 2 consecutive blocks max. Note this will count a 'spot' for each extension. IE someone can do 4 headcount for one block, or 2 headcount for 2 blocks.
+
+ fill_last_minute_reservations: True #True/False. If a reservation is available within the last minute window, the bot will post it's availability whenever it's job_schedule runs (Will still have to be reserved the same way). Does nothing if max_spots_per_day is 0 (Unlimited).
+ fill_reservations: Ask #if a reservation is made and is for a smaller number than max_reserved_per_reservation then this option can decide how that reservation is filled to the max (Or if it is at all). Once that reservation has a time block assigned to (in case external scheduling can't book that far out yet) the bot will post that reservation with the option to join it. This post will happen on the custom_job_schedule. Can be set to True, False, or Ask to allow the user to decide if they want the rest of their party to be filled by the bot. (IE they reserve 2 the bot will try to get 2 more)
+ max_time_in_future: 5w #d for day, w for week, m for month, y for year. How far out someone can schedule a reservation
+
+
+ reservation_cooldown: 4w #Time you must leave between reservations a specific person is involved with. 0 for no cooldown (Including multiple per day)
+ reservation_allowed_if_reservation_passed: True #if someone doesn't have an active reservation, let them reschedule regardless of the reservation cooldown.
+
+ free_last_minute_scheduling: True #don't apply any scheduling rules to reservations made within the last_minute_time_period (This can be abused if they cancel their reservation and immediately make a last minute reservation)
+ last_minute_time_period: 5d #time period to be considered 'last minute' where scheduling rules do not apply.
+ last_minute_disclaimer: "This schedule is considered 'last minute'. It will not count against your total allowed schedules, but there is no guarantee that a time block  will still be available"
+
+ require_slack_handle: False #If set to true you must tag all members that will be attending to be added to the invite. If false you optionally can or you can leave it blank (Such as for taking external guests)
+
+ days-available: [mon, tue, wed, thu, fri] #can be set to all if your external schedule allows, otherwise limit the days
+ external_scheduling: True #Note this means you have to write your own external-scheduling-plugin in some sort of functions file. This will be called at the scheduling portion. env-vars or hardcoded values needed
+ external_scheduling_function: fox-hollow-scheduler #If function returns False then event will be created for all-day. You can use all-day reservations in your custom_job_function to check back to see if times are available or not.
+ time-blocks-available: [9:00a-10:00a, 11:00a-12:00p] #These only apply if not using external scheduling. If using external scheduling this is totally ignored
+
+
+
+reminders_enabled: True
+reminders: [7d, 1d]
+allow_cancel_reservation: True
+cancel_non_aknowledged_reminders: True #cancel reservations that are never aknowledged. Still applies to individual max reservations, but frees up the block for someone else to make a reservation.
+cancel_reservations_with_no_time_blocks: 0d #if a reservation has no time block associated with it (such as if they never chose one once external scheduling became available and you message them in a custom job), then cancel the reservation. 0d to disable. 3d to cancel 3 days before reservation.
+aknowledge_grace_period: 3d #If the time between the reminder and the reservation is shorter than this period, then it won't apply to that reminder and the reservation will never be considered abandoned.
+job_schedule: 1d #Timeline to run both reminders, fill_reservations, and also the custom_job
+
+
+#CUSTOM FUNCTIONS (Must also be enabled)
+custom_jobs: True # periodically run something in addition to the regular stuff. Runs based on job_schedule.
+custom_job_function: validate_tee_times #function will be passed a dictionary of all calendar invites. You can use this if using a external scheduler, and you allow your users to make reservations before the external scheduler does. You can check for events with no times tied to it, and if the external scheduler has opened up that day you can send a message to reserver with available times to get them to choose one. Some functions are available for you to call/use. See docs.
+
+custom_cancel_function: True #Only use if using custom scheduling (external reservation). You will have to script this in your custom opt_out_function (Or ignore). This controls if your cancel_function is called or not.
+cancel_function: fox-hollow-reschedule-flow #Can also be used to simply remove names from a reservation. if fill_reservations is Ask, you can set it to true for this reservation and allow the bot to attempt to fill the reservation. If your external reservation can be cancelled, you can do that here instead.
+
+external_scheduling: True #Note this means you have to write your own external-scheduling-plugin in some sort of functions file. This will be called at the scheduling portion. env-vars or hardcoded values needed
+external_scheduling_function: fox-hollow-scheduler #If function returns False then event will be created for all-day. You can use all-day reservations in your custom_job_function to check back to see if times are available or not.
+
+
+#slackbot commands
+# make_reservation
+# get_reservations (Spits out reservations you have)
+# cancel_reservation (Lets you cancel a reservation you have made. If multiple people are on reservation it only removes you)
